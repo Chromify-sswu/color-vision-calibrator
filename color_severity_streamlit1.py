@@ -8,7 +8,7 @@ import json
 import io
 import math
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit  # --- [BUG FIX] --- 1. curve_fit 임포트 추가
+from scipy.optimize import curve_fit  
 
 st.set_page_config(page_title="색각 캘리브레이터", layout="centered")
 
