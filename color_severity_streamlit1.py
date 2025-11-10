@@ -1,5 +1,4 @@
 # color_severity_streamlit_v6_fixed.py
-# Usage: streamlit run color_severity_streamlit_v6_fixed.py
 
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
@@ -21,7 +20,6 @@ def lab_to_rgb(L, a, b):
     rgb8 = tuple((np.clip(rgb[0,0], 0, 1) * 255).astype(np.uint8))
     return rgb8
 
-# --- v6.0: 더 어렵고 정교한 plate 생성 ---
 def generate_ishihara_plate(number, axis, deltaE, rng, size=600):
     """
     개선 사항:
@@ -30,8 +28,6 @@ def generate_ishihara_plate(number, axis, deltaE, rng, size=600):
     3. 넓은 색 스펙트럼 유지
     4. 숫자 영역 노이즈 감소로 난이도 조절
     """
-    
-    #rng = np.random.RandomState(int(number * 100 + deltaE * 10))
     
     # 축별 특성 정의
     if axis == 'protan':
@@ -164,7 +160,6 @@ def generate_ishihara_plate(number, axis, deltaE, rng, size=600):
 
     return img
 
-# --- 개선된 Adaptive Staircase (v6.1) ---
 class AdaptiveStaircase:
     """
     v6.1 개선 사항:
@@ -177,11 +172,11 @@ class AdaptiveStaircase:
         self.history = []
         self.consecutive_correct = 0
         
-        self.step_size_large = 3  # [수정] 큰 탐색 (3칸)
-        self.step_size_small = 1  # [수정] 정밀 탐색 (1칸)
+        self.step_size_large = 3  # 큰 탐색 (3칸)
+        self.step_size_small = 1  # 정밀 탐색 (1칸)
         self.step_size = self.step_size_large
-        self.reversals = 0         # [수정] 방향 전환 횟수
-        self.last_direction = None # [수정] 마지막 이동 방향
+        self.reversals = 0         # 방향 전환 횟수
+        self.last_direction = None # 마지막 이동 방향
     
     def current_delta(self):
         return self.deltas[self.index]
@@ -194,7 +189,6 @@ class AdaptiveStaircase:
             self.consecutive_correct += 1
             if self.consecutive_correct >= 2:
                 self.consecutive_correct = 0
-                # --- [BUG FIX] --- 2.1: 주석을 코드와 일치시킴 (3번 -> 2번)
                 # 2번 맞힘: 어렵게 (index 증가)
                 new_index = min(len(self.deltas) - 1, self.index + self.step_size)
                 if new_index != self.index:
@@ -208,7 +202,7 @@ class AdaptiveStaircase:
                 self.index = new_index
                 current_direction = 'up' # 난이도 상승(up)
 
-        # [수정] 방향 전환(reversal) 감지
+        # 방향 전환(reversal) 감지
         if current_direction and self.last_direction:
             if current_direction != self.last_direction:
                 self.reversals += 1
@@ -255,7 +249,7 @@ with st.sidebar:
     - 안 보이면 '추측'하지 마세요
     """)
     
-    start = st.button('🚀 테스트 시작', type='primary')
+    start = st.button('테스트 시작', type='primary')
 
 # 세션 초기화
 for key in ['running', 'stair', 'stair_p', 'stair_d', 'stair_t', 'trial', 'axis', 'responses']:
@@ -279,7 +273,7 @@ if start:
         st.session_state.stair_d = AdaptiveStaircase(deltas)
         st.session_state.stair_t = AdaptiveStaircase(deltas)
         
-        # [수정] 공정한 Mix를 위해 문항 리스트를 미리 생성하고 섞음
+        # 공정한 Mix를 위해 문항 리스트를 미리 생성하고 섞음
         n_per_axis = n_trials // 3
         remainder = n_trials % 3
         trial_list = (['protan'] * n_per_axis) + (['deutan'] * n_per_axis) + (['tritan'] * n_per_axis)
@@ -304,7 +298,7 @@ if st.session_state.running:
     current_axis = st.session_state.axis
     
     if current_axis == 'mix':
-        # [수정] 무작위 선택(rng.choice) 대신, 미리 섞어둔 리스트에서 순서대로 가져옴
+        # 무작위 선택(rng.choice) 대신, 미리 섞어둔 리스트에서 순서대로 가져옴
         current_trial_axis = st.session_state.mix_trial_list[st.session_state.trial]
         delta = st.session_state[f'stair_{current_trial_axis[0]}'].current_delta()
         st.session_state.current_trial_axis_for_mix = current_trial_axis
@@ -379,13 +373,8 @@ if st.session_state.running:
         
         st.rerun()
 
-# --- 결과 화면 (v6.2 - 신뢰도 계산 추가) ---
 if not st.session_state.running and st.session_state.responses:
     st.success('✨ 테스트 완료!')
-    
-    # if not st.session_state.running and st.session_state.responses:
-    #     st.success('✨ 테스트 완료!')
-    #   (위 코드는 중복이므로 제거)
 
     def calculate_threshold_and_confidence(stair_history):
         """
@@ -410,9 +399,7 @@ if not st.session_state.running and st.session_state.responses:
 
             if correct:
                 consecutive_correct += 1
-                # --- [BUG FIX] --- 2.2: 알고리즘 일치 (3-down -> 2-down)
-                # 테스트 로직(AdaptiveStaircase)이 '2-down'이므로
-                # 분석 로직도 '2-down' (>= 2)으로 일치시킵니다.
+
                 if consecutive_correct >= 2:
                     consecutive_correct = 0
                     current_dir = 'down'
@@ -448,7 +435,6 @@ if not st.session_state.running and st.session_state.responses:
         def psychometric_func(deltaE, alpha, beta):
             # 0.5 (chance) to 1.0 (perfect)
             # 2-down-1-up은 ~70.7% 지점을 찾습니다.
-            # 0.5 + 0.5 * (1.0 / (1.0 + np.exp(-(deltaE - alpha) / beta)))
             return 1.0 / (1.0 + np.exp(-(deltaE - alpha) / beta))
 
         deltaE_arr = np.array([d for d, _ in stair_history])
@@ -464,13 +450,7 @@ if not st.session_state.running and st.session_state.responses:
                 maxfev=5000
             )
             alpha, beta = popt
-            # 70.7% detection point (2-down-1-up target)
-            # solve 1 / (1 + exp(-(x-a)/b)) = 0.707
-            # exp(-(x-a)/b) = (1/0.707) - 1 = 1.414 - 1 = 0.414
-            # -(x-a)/b = ln(0.414) = -0.88
-            # x-a = 0.88 * b
-            # x = a + 0.88 * b
-            # (75% 지점은 log(3) approx 1.1*beta 였음)
+    
             threshold_model = float(alpha + 0.881 * beta) # 70.7% 지점
 
             # model fit confidence (R^2-like)
@@ -492,18 +472,17 @@ if not st.session_state.running and st.session_state.responses:
         if confidence < 0.4 and len(stair_history) < 20:
             confidence *= (len(stair_history) / 20.0)
             
-        # (v6.2) 75% 지점이 아닌 70.7% 지점을 찾도록 수정
+        # 75% 지점이 아닌 70.7% 지점을 찾도록 수정
         # (로지스틱 함수가 0.5가 아닌 0에서 1로 피팅되므로 75% -> 70.7% 변경)
         # 75% -> solve(p=0.75) -> x = a + b * log(3)
         # 70.7% -> solve(p=0.707) -> x = a + b * log(0.707/(1-0.707)) = a + b * log(2.41) = a + b * 0.88
         
         # (재검토) 로지스틱 함수를 0~1로 피팅했으므로 75%가 아니라
-        # 2-down-1-up의 목표점인 70.7% 지점을 찾는 것이 맞습니다.
+        # 2-down-1-up의 목표점인 70.7% 지점을 찾는 것이 맞다.
         # (위 코드에서 threshold_model 계산을 70.7% 지점으로 수정함)
 
         return round(final_threshold, 2), round(float(np.clip(confidence, 0.0, 1.0)), 2)
 
-    # --- interpret_threshold 및 이후 결과 출력 로직은 기존 코드와 동일하게 이어집니다 ---
     def interpret_threshold(thresh, axis_type):
         """역치를 사람이 읽기 쉬운 문장으로 변환 (단순화)"""
         if thresh is None:
@@ -530,13 +509,11 @@ if not st.session_state.running and st.session_state.responses:
 
         return level, desc
 
-    # ... (이후 기존 결과 표시, 그래프, 다운로드 코드 계속)
-
     total_correct = sum([r['correct'] for r in st.session_state.responses])
     total_trials = len(st.session_state.responses)
     accuracy = (total_correct / total_trials) * 100 if total_trials > 0 else 0
 
-    st.header("📊 측정 결과")
+    st.header("측정 결과")
     st.warning("이 결과는 의학적 진단이 아닙니다. 교육/연구용 참고 자료입니다.")
     
     result_data = {}
@@ -566,7 +543,7 @@ if not st.session_state.running and st.session_state.responses:
                 help=f"{desc} (신뢰도 {conf*100:.0f}%)"
             )
         
-        st.markdown("### 📈 상세 해석")
+        st.markdown("### 상세 해석")
         for axis_key, name, emoji in [("protan", "적색맹", "🔴"), ("deutan", "녹색맹", "🟢"), ("tritan", "청색맹", "🔵")]:
             thresh = thresholds[axis_key]
             conf = confidences[axis_key]
@@ -610,7 +587,7 @@ if not st.session_state.running and st.session_state.responses:
 
             if thresh > 45:
                 st.warning("""
-                ⚠️ 높은 역치가 측정되었습니다.
+                높은 역치가 측정되었습니다.
                 
                 **가능한 원인:**
                 - 모니터 밝기/대비가 낮음
@@ -634,7 +611,7 @@ if not st.session_state.running and st.session_state.responses:
         }
 
     # 그래프
-    st.markdown("### 📉 측정 과정")
+    st.markdown("### 측정 과정")
     fig, ax = plt.subplots(figsize=(10, 6))
     
     if st.session_state.axis == 'mix':
@@ -673,7 +650,7 @@ if not st.session_state.running and st.session_state.responses:
     st.pyplot(fig)
 
     # 데이터 다운로드
-    with st.expander("📥 데이터 다운로드"):
+    with st.expander("데이터 다운로드"):
         st.json(result_data)
         
         buf = io.BytesIO()
@@ -682,7 +659,7 @@ if not st.session_state.running and st.session_state.responses:
         st.download_button('JSON 다운로드', buf, f'color_test_{st.session_state.axis}.json', 'application/json')
 
 elif not st.session_state.running:
-    st.info("👈 사이드바에서 설정 후 '테스트 시작'을 누르세요")
+    st.info("사이드바에서 설정 후 '테스트 시작'을 누르세요")
     
     st.markdown("### 예시 이미지")
     st.caption("실제 테스트에서는 훨씬 어려운 문제가 나옵니다!")
